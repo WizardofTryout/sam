@@ -177,6 +177,12 @@ type Store interface {
 	// IsIdentityBanned checks if an identity is currently banned.
 	IsIdentityBanned(ctx context.Context, identity string) (bool, error)
 
+	// ListBannedPeerIDs returns the peer IDs of every currently banned node.
+	// Callers publish this as the complete ban set (see
+	// ControlPlaneInfoResponse.banned_peer_ids), so it must be the whole list
+	// rather than a page of it.
+	ListBannedPeerIDs(ctx context.Context) ([]string, error)
+
 	// UpsertRouterLease updates or creates a lease for a sam-router.
 	UpsertRouterLease(ctx context.Context, lease *RouterLease) error
 
