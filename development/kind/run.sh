@@ -267,10 +267,8 @@ echo "  control plane: http://${MAIN_IP}"
 echo "  dex:           ${OIDC_ISSUER}"
 echo
 echo "To put a service on the mesh, deploy an example with charts/sam-node:"
-echo "  docker build -t calc-mcp:local development/examples/calc-mcp"
-echo "  kind load docker-image --name ${CLUSTER} calc-mcp:local"
-echo "  ${HELM} --kube-context ${KCTX} -n ${NAMESPACE} install calc-mcp charts/sam-node \\"
-echo "    -f development/kind/sam-node.values.yaml -f development/examples/calc-mcp/values.yaml"
+echo "  ./development/kind/deploy-kind-example.sh calc-mcp"
+echo "(it prints the docker build / kind load / helm install commands as it runs them)"
 echo
 echo "To drive the mesh, enroll a local node in another shell (it stays in the foreground):"
 echo "  make build && make kind-local-node"

@@ -69,6 +69,16 @@ helm --kube-context kind-sam-kind -n sam-kind install calc-mcp charts/sam-node \
   -f development/examples/calc-mcp/values.yaml
 ```
 
+`development/kind/deploy-kind-example.sh` wraps those commands (as
+`helm upgrade --install`, plus a rollout wait) and echoes each one as it
+runs, so deploying — or redeploying after a code change — is one line.
+Extra args pass through to helm:
+
+```bash
+./development/kind/deploy-kind-example.sh calc-mcp
+./development/kind/deploy-kind-example.sh code-reviewer-pool/reviewer --set replicaCount=3
+```
+
 To write your own service, copy an example folder: a backend listening on a
 local port, a `Dockerfile`, and a `values.yaml` declaring the service —
 

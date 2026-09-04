@@ -15,23 +15,8 @@
 
 set -euo pipefail
 
-KCTX="kind-sam-kind"
-NAMESPACE="sam-kind"
-
-# Same helm fallback as run.sh: CI and dev boxes may only have ./bin/helm.
-HELM="helm"
-if ! command -v helm >/dev/null 2>&1; then
-  [[ -x "./bin/helm" ]] || { echo "missing prerequisite: helm (install helm or place it in ./bin/helm)" >&2; exit 1; }
-  HELM="./bin/helm"
-fi
-
 echo "== Deploying calc-mcp via charts/sam-node =="
-docker build -t calc-mcp:local development/examples/calc-mcp
-kind load docker-image --name sam-kind calc-mcp:local
-"${HELM}" --kube-context "${KCTX}" -n "${NAMESPACE}" install calc-mcp charts/sam-node \
-  -f development/kind/sam-node.values.yaml \
-  -f development/examples/calc-mcp/values.yaml
-kubectl --context "${KCTX}" -n "${NAMESPACE}" rollout status deployment/calc-mcp-sam-node --timeout=180s
+./development/kind/deploy-kind-example.sh calc-mcp
 
 # If running locally, we might want to store logs in a temp dir
 LOG_DIR="${RUNNER_TEMP:-$(mktemp -d)}"
