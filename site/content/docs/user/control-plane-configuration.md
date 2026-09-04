@@ -23,6 +23,8 @@ The Control Plane is responsible for bridging user identities from trusted OIDC 
 | `--allowed-audiences` | *None* | `sam-mesh-audience` | Comma-separated list of allowed JWT audiences. |
 | `--admin-token-path` (or env `SAM_ADMIN_TOKEN`) | *None* | *None* | File containing the secret token required in the HTTP Header `Authorization: Bearer <token>` for admin operations. |
 | `--insecure-skip-tls-verify` | *None* | `false` | Set to `true` to skip certificate validation for development/testing OIDC providers. |
+| `--biscuit-ttl` | *None* | `24h` | Lifespan minted into every issued Biscuit token. Capped to the OIDC token's own expiry when shorter. |
+| `--oidc-session-ttl` | *None* | `2160h` (90 days) | How long an OIDC enrollment stays refreshable before the identity must re-authenticate with the OIDC provider. Shorter values keep the provider authoritative for offboarding, at the cost of more frequent interactive re-enrollment. |
 | `--key-rotation-interval` | *None* | `24h` | Key rotation interval (e.g. `24h`). `0s` disables rotation. |
 | `--key-grace-period` | *None* | `1h` | Key grace period for rotated keys. |
 | `--lease-duration` | *None* | `15m` | Router lease registration TTL. |

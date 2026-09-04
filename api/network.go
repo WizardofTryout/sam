@@ -65,9 +65,10 @@ const (
 	// This is verified locally by each peer on every connection.
 	BiscuitTokenTTL = 24 * time.Hour
 
-	// OIDCSessionTTL is the maximum database-enforced lifespan of a node's OIDC
+	// OIDCSessionTTL is the default database-enforced lifespan of a node's OIDC
 	// interactive enrollment session (90 days). After this period, the node
 	// must re-authenticate with the OIDC provider to establish a new session.
+	// Operators tune the cadence with the control plane's --oidc-session-ttl.
 	OIDCSessionTTL = 90 * 24 * time.Hour
 
 	// TokenRefreshCheckInterval is the frequency at which the node daemon and router check

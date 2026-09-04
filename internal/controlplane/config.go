@@ -35,6 +35,7 @@ type Options struct {
 	InsecureSkipTLSVerify bool
 	BiscuitTimeout        time.Duration
 	BiscuitTTL            time.Duration // Lifespan minted into every issued Biscuit's expiration() fact; defaults to api.BiscuitTokenTTL
+	OIDCSessionTTL        time.Duration // How long an OIDC enrollment stays refreshable before the identity must re-authenticate interactively; defaults to api.OIDCSessionTTL
 	AdminToken            string        // Optional: administrative bearer token for protecting policy and enrollment queue REST APIs
 	AutoApproveEnrollment bool          // If true, valid bootstrap token enrollment requests are immediately approved without administrative manual gate
 }
@@ -59,6 +60,9 @@ func (o *Options) Default() {
 	}
 	if o.BiscuitTTL <= 0 {
 		o.BiscuitTTL = api.BiscuitTokenTTL
+	}
+	if o.OIDCSessionTTL <= 0 {
+		o.OIDCSessionTTL = api.OIDCSessionTTL
 	}
 }
 

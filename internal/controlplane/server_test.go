@@ -2207,6 +2207,100 @@ func TestAuthDenialPaths(t *testing.T) {
 	})
 }
 
+// TestOIDCSessionTTLIsConfigurable pins the GHSA-cgmg-9xf6-rrgw session-length
+// answer: how long one OIDC login stays refreshable is the operator's
+// --oidc-session-ttl decision. A lapsed session refuses refresh (forcing
+// interactive re-auth) and the first biscuit never outlives the session.
+func TestOIDCSessionTTLIsConfigurable(t *testing.T) {
+	issuer, mintToken := startCustomMockOIDC(t)
+	const sessionTTL = 2 * time.Second
+	srv, store, baseURL := setupTestServer(t, issuer, func(o *Options) {
+		o.OIDCSessionTTL = sessionTTL
+	})
+	defer func() {
+		_ = srv.Close()
+		_ = store.Close()
+	}()
+
+	ctx := context.Background()
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	if err := store.SaveMeshPolicy(ctx, nil, []*api.PolicyBinding{
+		{Role: api.RoleNode, Members: []string{api.SystemAuthenticated}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	privNode, pubNode, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodePeer, err := peer.IDFromPrivateKey(privNode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, _ := crypto.MarshalPublicKey(pubNode)
+	enrolledAt := time.Now()
+	reqData, _ := proto.Marshal(&api.EnrollRequest{
+		Jwt:           mintToken(map[string]interface{}{"sub": "short-session"}),
+		PeerId:        nodePeer.String(),
+		PublicKey:     pubBytes,
+		RequestedRole: api.RoleNode,
+	})
+	resp, err := client.Post(baseURL+"/register", "application/x-protobuf", bytes.NewReader(reqData))
+	if err != nil {
+		t.Fatalf("/register failed: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/register status %s (body: %s)", resp.Status, body)
+	}
+	var enrollResp api.EnrollResponse
+	if err := proto.Unmarshal(body, &enrollResp); err != nil {
+		t.Fatal(err)
+	}
+
+	// The configured TTL, not the 90-day default, bounds the session record
+	// and the first biscuit alike.
+	nodeRecord, err := store.GetNode(ctx, nodePeer.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if skew := nodeRecord.ExpiresAt.Sub(enrolledAt.Add(sessionTTL)); skew < -2*time.Second || skew > 2*time.Second {
+		t.Errorf("session ExpiresAt is %v, want ~%v", nodeRecord.ExpiresAt, enrolledAt.Add(sessionTTL))
+	}
+	if reported := time.Unix(enrollResp.Expiration, 0); reported.After(nodeRecord.ExpiresAt.Add(2 * time.Second)) {
+		t.Errorf("biscuit expiration %v outlives the session %v", reported, nodeRecord.ExpiresAt)
+	}
+
+	// Once the session lapses, a correctly signed refresh is refused: the
+	// identity has to go back to the OIDC provider.
+	time.Sleep(sessionTTL + 500*time.Millisecond)
+
+	timestamp := time.Now().UnixMilli()
+	challengeSig, err := privNode.Sign(api.RefreshChallenge(nodePeer.String(), timestamp))
+	if err != nil {
+		t.Fatal(err)
+	}
+	refreshData, _ := proto.Marshal(&api.TokenRefreshRequest{
+		ChallengeSignature: challengeSig,
+		Timestamp:          timestamp,
+	})
+	req, _ := http.NewRequest("POST", baseURL+"/refresh", bytes.NewReader(refreshData))
+	req.Header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(enrollResp.BiscuitToken))
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("refresh failed: %v", err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("refresh after session expiry: got %s (body: %s), want 401", resp.Status, body)
+	}
+}
+
 // TestBanSurvivesKeypairRegeneration pins the fix for the GHSA-cgmg-9xf6-rrgw
 // ban-bypass claim: bans were keyed only on peer_id, which the node itself
 // mints, so a banned operator regenerated a keypair and re-enrolled. Revoking

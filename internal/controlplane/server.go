@@ -552,11 +552,20 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The session bounds how long refresh works without the identity proving
+	// itself to the issuer again, so its length is the operator's re-auth
+	// cadence decision (--oidc-session-ttl), not a constant.
+	sessionExpiresAt := time.Now().Add(s.config.OIDCSessionTTL)
+
 	// Mint token. A biscuit must never outlive the OIDC token that vouched
-	// for it, so its expiration is capped at whichever comes first.
+	// for it, nor the session it belongs to; its expiration is capped at
+	// whichever comes first.
 	biscuitExpiry := time.Now().Add(s.config.BiscuitTTL)
 	if token.Expiry.Before(biscuitExpiry) {
 		biscuitExpiry = token.Expiry
+	}
+	if sessionExpiresAt.Before(biscuitExpiry) {
+		biscuitExpiry = sessionExpiresAt
 	}
 	biscuitData, _, err := identity.MintBiscuitToken(privKey, claims, token, pID, biscuitExpiry, finalRoles, policyRoles, req.Labels)
 	if err != nil {
@@ -565,8 +574,6 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Session TTL is 90 days for OIDC interactive enrollment
-	sessionExpiresAt := time.Now().Add(api.OIDCSessionTTL)
 	primaryRole := req.RequestedRole
 
 	claimsBytes, err := json.Marshal(claims)

@@ -42,6 +42,7 @@ var (
 	keyGracePeriod        time.Duration
 	leaseDuration         time.Duration
 	biscuitTTL            time.Duration
+	oidcSessionTTL        time.Duration
 	adminTokenPath        string
 	insecureSkipTLSVerify bool
 	logLevel              string
@@ -122,6 +123,7 @@ func main() {
 				InsecureSkipTLSVerify: insecureSkipTLSVerify,
 				BiscuitTimeout:        10 * time.Second,
 				BiscuitTTL:            biscuitTTL,
+				OIDCSessionTTL:        oidcSessionTTL,
 				AdminToken:            adminToken,
 				AutoApproveEnrollment: autoApproveEnrollment,
 			}
@@ -156,6 +158,7 @@ func main() {
 	rootCmd.Flags().DurationVar(&keyGracePeriod, "key-grace-period", 1*time.Hour, "Key grace period for rotated keys.")
 	rootCmd.Flags().DurationVar(&leaseDuration, "lease-duration", 15*time.Minute, "Router lease registration TTL.")
 	rootCmd.Flags().DurationVar(&biscuitTTL, "biscuit-ttl", api.BiscuitTokenTTL, "Lifespan minted into every issued Biscuit's expiration fact. Capped to the OIDC token's own expiry when shorter.")
+	rootCmd.Flags().DurationVar(&oidcSessionTTL, "oidc-session-ttl", api.OIDCSessionTTL, "How long an OIDC enrollment stays refreshable before the identity must re-authenticate with the OIDC provider. Shorter values keep the provider authoritative for offboarding at the cost of more frequent interactive re-enrollment.")
 	rootCmd.Flags().StringVar(&adminTokenPath, "admin-token-path", "", "Path to file containing the token for authenticating policy REST API requests (or env SAM_ADMIN_TOKEN)")
 	rootCmd.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", false, "Skip TLS verification for OIDC providers")
 	rootCmd.Flags().StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
