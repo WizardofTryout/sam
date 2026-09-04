@@ -196,7 +196,7 @@ helm-lint:
 			exit 1; \
 		fi; \
 	fi; \
-	$$HELM_BIN lint ./charts/sam-mesh
+	$$HELM_BIN lint ./charts/sam-mesh && $$HELM_BIN lint ./charts/sam-node --set controlPlaneUrl=http://required-for-lint:8080
 
 # render the chart to bin/chart/ for inspection; pass extra flags via ARGS, e.g. ARGS="--set gateway.enabled=true"
 .PHONY: helm-template
@@ -211,7 +211,7 @@ lint: fmt helm-lint
 .PHONY: helm-test
 helm-test:
 	@helm plugin list 2>/dev/null | grep -q '^unittest' || helm plugin install https://github.com/helm-unittest/helm-unittest
-	helm unittest charts/sam-mesh
+	helm unittest charts/sam-mesh charts/sam-node
 
 .PHONY: verify
 verify:
