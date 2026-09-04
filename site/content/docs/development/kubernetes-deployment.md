@@ -79,6 +79,9 @@ and extra args pass through to helm:
 ./development/deploy-kind-service.sh development/examples/calc-mcp
 ./development/deploy-kind-service.sh development/examples/code-reviewer-pool/reviewer --set replicaCount=3
 ./development/deploy-kind-service.sh ~/src/my-service
+# same service as a second, differently-labeled node:
+RELEASE=calc-b ./development/deploy-kind-service.sh development/examples/calc-mcp \
+  --set-json 'extraArgs=["--discovery-interval=200ms","--labels=region=us-east-1"]'
 ```
 
 To write your own service, copy an example folder: a backend listening on a
