@@ -2,7 +2,7 @@
 # Enroll a locally-built ./bin/sam-node into the kind mesh the way a real external node joins:
 # a bootstrap token over the control plane's gateway address, peer traffic through the router's
 # node-IP multiaddrs. Extra args pass through, e.g. to host a service:
-#   ARGS="--config development/examples/calc-mcp/sam-node-config.yaml"
+#   ARGS="--config my-node.yaml"
 set -euo pipefail
 
 CLUSTER="sam-kind"

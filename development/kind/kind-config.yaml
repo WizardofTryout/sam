@@ -6,8 +6,3 @@ nodes:
     labels:
       sam-role: control-plane
   - role: worker
-    labels:
-      sam-role: node-a
-  - role: worker
-    labels:
-      sam-role: node-b
