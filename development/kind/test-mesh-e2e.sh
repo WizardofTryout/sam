@@ -16,7 +16,7 @@
 set -euo pipefail
 
 echo "== Deploying calc-mcp via charts/sam-node =="
-./development/kind/deploy-kind-example.sh calc-mcp
+./development/deploy-kind-service.sh calc-mcp
 
 # If running locally, we might want to store logs in a temp dir
 LOG_DIR="${RUNNER_TEMP:-$(mktemp -d)}"
