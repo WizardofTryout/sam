@@ -1,0 +1,4 @@
+# Kind-mesh wiring shared by every sam-node release; stack an example's
+# values on top: helm install <name> charts/sam-node -f this-file -f <example>/values.yaml
+controlPlaneUrl: http://sam-mesh-control-plane:8080
+extraArgs: ["--discovery-interval=200ms"]

@@ -1,8 +1,0 @@
-version: "v1alpha1"
-attenuation:
-  policies: []
-services:
-  - type: "mcp"
-    name: "calculator"
-    description: "Simple math operations"
-    target_url: "http://127.0.0.1:7777/mcp"
