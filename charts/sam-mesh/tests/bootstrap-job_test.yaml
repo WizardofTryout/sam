@@ -42,6 +42,27 @@ tests:
           path: spec.template.spec.containers[0].args[0]
           pattern: '"name": "sam:role:node".*"allowed_labels": \[\]'
 
+  - it: node role grants no services by default (fail closed)
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"name": "sam:role:node", "allowed_services": \[\]'
+
+  - it: node role grants only the configured services
+    documentSelector:
+      path: kind
+      value: Job
+    set:
+      bootstrap:
+        nodeServices: ["mcp://calculator", "system://sam.catalog"]
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"name": "sam:role:node", "allowed_services": \["mcp://calculator","system://sam.catalog"\]'
+
   - it: node role grants only the configured label patterns
     documentSelector:
       path: kind

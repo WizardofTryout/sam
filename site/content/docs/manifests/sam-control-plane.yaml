@@ -86,6 +86,13 @@ spec:
 ---
 # The control plane starts default closed: it has no policy until one is posted.
 # Seed it over the admin API, which is the only way policy is ever set.
+#
+# SECURITY: a role names what its members may call; a binding names who they
+# are. The special member "sam:system:authenticated" matches EVERY identity
+# the configured OIDC issuer will vouch for — bound to a wildcard role it
+# hands every tool on every node to anyone who can obtain a token from that
+# issuer. Never ship that combination. Grant explicit services to explicit
+# members, as below.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -114,10 +121,10 @@ spec:
             -H "Authorization: Bearer ${SAM_ADMIN_TOKEN}" \
             -d '{
               "roles": [
-                {"name": "public-mesh", "allowed_services": ["*"], "allowed_targets": ["*"]}
+                {"name": "demo-caller", "allowed_services": ["mcp://calculator", "system://sam.catalog"], "allowed_targets": ["user:test-user"]}
               ],
               "bindings": [
-                {"role": "public-mesh", "members": ["sam:system:authenticated"]}
+                {"role": "demo-caller", "members": ["user:test-user"]}
               ]
             }' \
             http://sam-control-plane:8080/policies

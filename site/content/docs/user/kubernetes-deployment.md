@@ -138,7 +138,7 @@ curl -sf -X POST \
   -H "Authorization: Bearer ${SAM_ADMIN_TOKEN}" \
   -d '{
     "roles": [
-      {"name": "node-role", "allowed_services": ["*"], "allowed_targets": ["*"]}
+      {"name": "node-role", "allowed_services": ["mcp://calculator", "system://sam.catalog"], "allowed_targets": ["user:system:serviceaccount:sam-nodes:sam-node-sa"]}
     ],
     "bindings": [
       {"role": "node-role", "members": ["user:system:serviceaccount:sam-nodes:sam-node-sa"]}
@@ -146,6 +146,13 @@ curl -sf -X POST \
   }' \
   https://CONTROL-PLANE.YOUR-DOMAIN.COM/policies
 ```
+
+> **Grant the least privilege that works.** A role's `allowed_services` names the
+> exact backends its members may invoke — list them explicitly rather than using
+> `["*"]`. Be especially careful with the member `sam:system:authenticated`: it
+> matches every identity your OIDC issuer will authenticate, and enrollment is
+> open to any of them, so binding it to a wildcard role gives every tool on every
+> node to anyone who can obtain a token from that issuer.
 
 The `sam-mesh` Helm chart runs this as a bootstrap Job for you; see
 `charts/sam-mesh/templates/bootstrap-job.yaml`.

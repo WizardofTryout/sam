@@ -61,6 +61,14 @@ The policy defines what endpoints and services agents are permitted to use:
 
 > **`allowed_agents` and `allowed_targets` do different things.** `allowed_targets` controls which agents a node can send requests *to*. `allowed_agents` controls which agents a node can claim to be acting *for*. Setting `allowed_agents` to `*` lets any node with that role claim any agent identity in the mesh, so nodes log a warning when they receive such a grant.
 
+> **`sam:system:authenticated` means everyone your issuer vouches for.** That
+> special member matches every identity able to obtain a token from the
+> configured OIDC provider — and enrollment is open to all of them. Binding it
+> to a role with wildcard `allowed_services` therefore grants every tool on
+> every node to anyone the issuer will authenticate, which for a public
+> provider is the whole internet. Reserve it for intentionally public meshes,
+> and pair it only with narrowly scoped roles (e.g. `system://sam.catalog`).
+
 ### Seeding Policies via REST API
 Admins manage policies by sending a JSON payload to the `/policies` endpoint.
 
