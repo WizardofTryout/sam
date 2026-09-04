@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# Build, load and install a service into the kind mesh. Takes an example name
-# under development/examples/ or a path to any directory with a Dockerfile and
-# a charts/sam-node values.yaml. Extra args pass to helm, e.g. --set replicaCount=3
+# Build, load and install a service into the kind mesh from a directory holding
+# a Dockerfile and a charts/sam-node values.yaml (e.g. development/examples/calc-mcp).
+# Extra args pass to helm, e.g. --set replicaCount=3
 set -euo pipefail
 
-[[ $# -ge 1 ]] || { echo "usage: $(basename "$0") <example|service-dir> [helm args...]" >&2; exit 1; }
+[[ $# -ge 1 ]] || { echo "usage: $(basename "$0") <service-dir> [helm args...]" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SERVICE="$1"; shift
-if [[ -d "${SERVICE}" ]]; then
-  DIR="$(cd "${SERVICE}" && pwd)"
-else
-  DIR="${PROJECT_ROOT}/development/examples/${SERVICE}"
-fi
-[[ -f "${DIR}/values.yaml" ]] || { echo "no values.yaml in ${DIR} (pass an example name under development/examples/ or a path to a service directory)" >&2; exit 1; }
+[[ -d "$1" ]] || { echo "not a directory: $1" >&2; exit 1; }
+DIR="$(cd "$1" && pwd)"; shift
+[[ -f "${DIR}/values.yaml" ]] || { echo "no values.yaml in ${DIR}" >&2; exit 1; }
 NAME="$(basename "${DIR}")"
 
 HELM="helm"

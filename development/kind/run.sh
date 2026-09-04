@@ -267,7 +267,7 @@ echo "  control plane: http://${MAIN_IP}"
 echo "  dex:           ${OIDC_ISSUER}"
 echo
 echo "To put a service on the mesh, deploy an example with charts/sam-node:"
-echo "  ./development/deploy-kind-service.sh calc-mcp"
+echo "  ./development/deploy-kind-service.sh development/examples/calc-mcp"
 echo "(it prints the docker build / kind load / helm install commands as it runs them)"
 echo
 echo "To drive the mesh, enroll a local node in another shell (it stays in the foreground):"

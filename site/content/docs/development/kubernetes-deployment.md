@@ -72,12 +72,12 @@ helm --kube-context kind-sam-kind -n sam-kind install calc-mcp charts/sam-node \
 `development/deploy-kind-service.sh` wraps those commands (as
 `helm upgrade --install`, plus a rollout wait) and echoes each one as it
 runs, so deploying — or redeploying after a code change — is one line. It
-takes an example name or a path to any directory holding a `Dockerfile` and
-a `values.yaml`, and extra args pass through to helm:
+takes a path to any directory holding a `Dockerfile` and a `values.yaml`,
+and extra args pass through to helm:
 
 ```bash
-./development/deploy-kind-service.sh calc-mcp
-./development/deploy-kind-service.sh code-reviewer-pool/reviewer --set replicaCount=3
+./development/deploy-kind-service.sh development/examples/calc-mcp
+./development/deploy-kind-service.sh development/examples/code-reviewer-pool/reviewer --set replicaCount=3
 ./development/deploy-kind-service.sh ~/src/my-service
 ```
 
