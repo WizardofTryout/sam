@@ -106,39 +106,33 @@ The reviewer workers shell out to an LLM, so set your API key on the API-key
 `ENV` line in `development/examples/code-reviewer-pool/reviewer/Dockerfile`
 before building (a free key is fine for the demo).
 
-### 2. Mesh layout
-
-This use case needs five node slots, and the cluster ships with two (`node-a`
-and `node-b`). Add the three missing workers to
-`development/kind/kind-config.yaml` first:
-
-```yaml
-  - role: worker
-    labels:
-      sam-role: node-c
-  - role: worker
-    labels:
-      sam-role: node-d
-  - role: worker
-    labels:
-      sam-role: node-e
-```
-
-Then write this layout into `development/kind/mesh-config.yaml`:
-
-```yaml
-node-a:                                 # bare node (orchestrator entry)
-node-b: code-reviewer-pool/reviewer     # worker
-node-c: code-reviewer-pool/reviewer     # worker
-node-d: code-reviewer-pool/reviewer     # worker
-node-e: code-reviewer-pool/manager      # manager
-```
-
-### 3. Bring the mesh up and start a local orchestrator node
+### 2. Bring the mesh up and deploy the pool
 
 ```bash
 make build            # builds ./bin/sam-node (once)
-make kind-up          # control plane + router + reviewer pool (node-b/c/d) + manager (node-e)
+make kind-up          # control plane + router (no sam-nodes yet)
+```
+
+Then build the two images and deploy the pool as `charts/sam-node` releases —
+three reviewer replicas (each replica enrolls as its own mesh node, so the
+pool is three same-named `code-reviewer` services) and one manager:
+
+```bash
+docker build -t reviewer:local development/examples/code-reviewer-pool/reviewer
+docker build -t pool-manager:local development/examples/code-reviewer-pool/manager
+kind load docker-image --name sam-kind reviewer:local pool-manager:local
+
+helm --kube-context kind-sam-kind -n sam-kind install reviewers charts/sam-node \
+  -f development/kind/sam-node.values.yaml \
+  -f development/examples/code-reviewer-pool/reviewer/values.yaml --set replicaCount=3
+helm --kube-context kind-sam-kind -n sam-kind install manager charts/sam-node \
+  -f development/kind/sam-node.values.yaml \
+  -f development/examples/code-reviewer-pool/manager/values.yaml
+```
+
+### 3. Start a local orchestrator node
+
+```bash
 make kind-local-node  # local sam-node enrolled in the mesh — LEAVE RUNNING
 ```
 
@@ -199,13 +193,13 @@ in the pool.
 
 ### 6. Elasticity beat (add a worker mid-job)
 
-Scale a reviewer down, start a larger job, then scale it back up — the manager
-picks the new worker up on its next discovery pass and starts leasing it:
+Scale the reviewer pool down, start a larger job, then scale it back up — the
+manager picks the new worker up on its next discovery pass and starts leasing it:
 
 ```bash
-kubectl --context kind-sam-kind -n sam-kind scale deploy/node-d --replicas=0
+kubectl --context kind-sam-kind -n sam-kind scale deploy/reviewers-sam-node --replicas=2
 # start a big job, then:
-kubectl --context kind-sam-kind -n sam-kind scale deploy/node-d --replicas=1
+kubectl --context kind-sam-kind -n sam-kind scale deploy/reviewers-sam-node --replicas=3
 ```
 
 ## Configuration

@@ -245,6 +245,12 @@ Refer to [dns-sync-cronjob-template.yaml](https://github.com/google/sam/blob/mai
 
 To secure nodes without distributing static passwords, configure nodes to authenticate via **ServiceAccount projected tokens** (Workload Identity Federation).
 
+> [!TIP]
+> The repository ships this pattern as a Helm chart: `charts/sam-node`
+> renders the ServiceAccount, config ConfigMap and Deployment below from a
+> small values file (see the chart's README). The manifests that follow show
+> what it produces.
+
 ### 1. Create a ServiceAccount
 ```yaml
 apiVersion: v1
