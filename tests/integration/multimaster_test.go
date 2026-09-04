@@ -41,9 +41,12 @@ func TestMultiMasterControlPlane(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	// Create a mock policy file
+	// Create a mock policy file. Node enrollment requires the requested role
+	// to resolve from a binding, so bind it to the test node's identity.
 	policyFile := filepath.Join(tmpDir, "policies.yaml")
-	policyContent := `bindings: []
+	policyContent := `bindings:
+  - role: sam:role:node
+    members: ["user:mock-user"]
 roles: []
 `
 	writePolicyWithRouter(t, policyFile, policyContent)

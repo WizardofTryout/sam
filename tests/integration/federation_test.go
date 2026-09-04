@@ -47,6 +47,8 @@ func TestRouterFederationAndRelay(t *testing.T) {
 	policyContent := `bindings:
   - members: ["user:mock-user"]
     role: admin
+  - members: ["user:mock-user"]
+    role: sam:role:node
 roles:
   - name: admin
     allowed_services:

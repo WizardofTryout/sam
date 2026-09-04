@@ -130,6 +130,7 @@ curl -s -X POST \
     ],
     "bindings": [
       {"role": "admin", "members": ["sam:system:authenticated"]},
+      {"role": "sam:role:node", "members": ["sam:system:authenticated"]},
       {"role": "sam:role:router", "members": ["group:routers"]}
     ]
   }' \

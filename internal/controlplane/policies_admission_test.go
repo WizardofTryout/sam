@@ -45,6 +45,12 @@ func TestPoliciesRequiresAnAdmissibleNode(t *testing.T) {
 	ctx := context.Background()
 	client := &http.Client{Timeout: 5 * time.Second}
 
+	// Enrollment requires the requested role to resolve from a binding.
+	nodeBindings := []*api.PolicyBinding{{Role: api.RoleNode, Members: []string{"group:users"}}}
+	if err := store.SaveMeshPolicy(ctx, nil, nodeBindings); err != nil {
+		t.Fatalf("failed to seed policy: %v", err)
+	}
+
 	privNode, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
 	if err != nil {
 		t.Fatal(err)

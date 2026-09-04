@@ -124,7 +124,8 @@ spec:
                 {"name": "demo-caller", "allowed_services": ["mcp://calculator", "system://sam.catalog"], "allowed_targets": ["user:test-user"]}
               ],
               "bindings": [
-                {"role": "demo-caller", "members": ["user:test-user"]}
+                {"role": "demo-caller", "members": ["user:test-user"]},
+                {"role": "sam:role:node", "members": ["user:test-user"]}
               ]
             }' \
             http://sam-control-plane:8080/policies

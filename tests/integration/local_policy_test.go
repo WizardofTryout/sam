@@ -42,6 +42,8 @@ bindings:
     members: ["user:unprivileged-user"]
   - role: none
     members: ["user:nodeB-user"]
+  - role: sam:role:node
+    members: ["user:unprivileged-user", "user:nodeB-user"]
 `
 	if err := os.WriteFile(controlPlanePolicyFile, []byte(controlPlanePolicyYAML), 0644); err != nil {
 		t.Fatal(err)
@@ -185,6 +187,8 @@ bindings:
     members: ["user:client-user"]
   - role: restricted-role
     members: ["user:nodeB-user"]
+  - role: sam:role:node
+    members: ["user:client-user", "user:nodeB-user"]
 `
 	if err := os.WriteFile(controlPlanePolicyFile, []byte(controlPlanePolicyYAML), 0644); err != nil {
 		t.Fatal(err)

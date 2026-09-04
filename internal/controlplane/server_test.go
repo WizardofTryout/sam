@@ -290,6 +290,7 @@ func TestNodeAndRouterRegistrationFlow(t *testing.T) {
 	}
 	bindings := []*api.PolicyBinding{
 		{Role: api.RoleRouter, Members: []string{"group:routers"}},
+		{Role: api.RoleNode, Members: []string{"group:users"}},
 		{Role: "user-role", Members: []string{"group:users"}},
 	}
 	if err := store.SaveMeshPolicy(ctx, roles, bindings); err != nil {
@@ -2160,6 +2161,22 @@ func TestAuthDenialPaths(t *testing.T) {
 		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("expected 401 for wrong admin token, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("node enrollment is closed until a binding grants it", func(t *testing.T) {
+		// No sam:role:node binding exists yet; the removed fallback used to
+		// enroll any authenticated identity here (GHSA-cgmg-9xf6-rrgw).
+		anybodyJWT := mintToken(map[string]interface{}{
+			"sub": "node-anybody",
+		})
+		resp, err := client.Post(baseURL+"/register", "application/x-protobuf", bytes.NewReader(newEnrollBody(anybodyJWT)))
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("expected 403 for unbound sam:role:node enrollment, got %d", resp.StatusCode)
 		}
 	})
 

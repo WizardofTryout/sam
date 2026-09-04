@@ -85,7 +85,9 @@ func TestDebugEndpoints(t *testing.T) {
 
 	// Create a mock policy file
 	policyFile := filepath.Join(tmpDir, "policies.yaml")
-	policyContent := `bindings: []
+	policyContent := `bindings:
+  - members: ["user:mock-user"]
+    role: sam:role:node
 roles: []
 `
 	if err := os.WriteFile(policyFile, []byte(policyContent), 0644); err != nil {

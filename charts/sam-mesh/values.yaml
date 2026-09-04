@@ -180,6 +180,11 @@ console:
 
 bootstrap:
   bindings: []
+  # Identities that may enroll as sam:role:node ("user:<sub>", "group:<name>",
+  # "email:<addr>", or "sam:system:authenticated" for an intentionally open
+  # mesh). Empty means no node can enroll until an operator grants it (fail
+  # closed). Ignored when bindings is set: then you own the whole list.
+  nodeMembers: []
   # Services sam:role:node may call, as "type://name" entries (e.g.
   # "mcp://calculator"). Any authenticated identity can claim sam:role:node,
   # so this list is effectively mesh-wide. Empty means nodes can call nothing

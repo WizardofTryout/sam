@@ -141,6 +141,7 @@ func setupControlPlane(t *testing.T, oidcIssuer string) (*controlplane.Server, s
 	}
 	bindings := []*api.PolicyBinding{
 		{Role: api.RoleRouter, Members: []string{"group:routers"}},
+		{Role: api.RoleNode, Members: []string{"group:users"}},
 		{Role: "user-role", Members: []string{"group:users"}},
 	}
 

@@ -141,7 +141,8 @@ curl -sf -X POST \
       {"name": "node-role", "allowed_services": ["mcp://calculator", "system://sam.catalog"], "allowed_targets": ["user:system:serviceaccount:sam-nodes:sam-node-sa"]}
     ],
     "bindings": [
-      {"role": "node-role", "members": ["user:system:serviceaccount:sam-nodes:sam-node-sa"]}
+      {"role": "node-role", "members": ["user:system:serviceaccount:sam-nodes:sam-node-sa"]},
+      {"role": "sam:role:node", "members": ["user:system:serviceaccount:sam-nodes:sam-node-sa"]}
     ]
   }' \
   https://CONTROL-PLANE.YOUR-DOMAIN.COM/policies

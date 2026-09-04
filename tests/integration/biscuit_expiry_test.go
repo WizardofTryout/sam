@@ -66,6 +66,7 @@ func TestBiscuitExpiryIsEnforcedOnEveryPath(t *testing.T) {
 
 	cpCmd := exec.Command(cpBin,
 		"--bind-address", fmt.Sprintf("127.0.0.1:%d", cpPort),
+		"--admin-token-path", tokenPath(t, "test-admin-token"),
 		"--db-dsn", filepath.Join(tmpDir, "cp-keys.db"),
 		"--issuer", oidcURL,
 		"--insecure-skip-tls-verify",
@@ -78,6 +79,16 @@ func TestBiscuitExpiryIsEnforcedOnEveryPath(t *testing.T) {
 	}
 	defer func() { _ = cpCmd.Process.Kill(); _ = cpCmd.Wait() }()
 	waitForControlPlane(t, cpPort)
+
+	// Node enrollment requires the requested role to resolve from a binding.
+	// The grants mirror the shape this test always ran with (the no-policy
+	// mint fallback): unrestricted, because the subject here is expiry.
+	policyFile := filepath.Join(tmpDir, "policies.yaml")
+	policyYAML := "roles:\n  - name: sam:role:node\n    allowed_services: [\"*\"]\n    allowed_targets: []\n    custom_datalog: [\"target_unrestricted();\"]\nbindings:\n  - role: sam:role:node\n    members: [\"user:expiry-user\"]\n"
+	if err := os.WriteFile(policyFile, []byte(policyYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+	injectPolicyYAML(t, cpPort, "test-admin-token", policyFile)
 
 	privKey, pubKey, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

@@ -107,8 +107,10 @@ spec:
             {{- $bindings = list
               (dict "role" "sam:role:router" "members" (list "group:routers" $defaultRouterSA))
               (dict "role" "sam:role:sambox" "members" (list (printf "user:system:serviceaccount:%s:sam-box-sa" .Release.Namespace)))
-              (dict "role" "sam:role:node" "members" (list "group:data-scientist" "group:users"))
             -}}
+            {{- if .Values.bootstrap.nodeMembers -}}
+              {{- $bindings = append $bindings (dict "role" "sam:role:node" "members" .Values.bootstrap.nodeMembers) -}}
+            {{- end -}}
           {{- end }}
           curl -sf -X POST \
             -H "Content-Type: application/json" \

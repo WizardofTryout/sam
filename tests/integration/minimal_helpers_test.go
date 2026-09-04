@@ -658,7 +658,10 @@ func writePolicyWithRouter(t *testing.T, path string, yamlContent string) {
 
 	routerRole := fmt.Sprintf(`  - name: %s
     allowed_services: []
-    allowed_targets: ["*"]`, api.RoleRouter)
+    allowed_targets: ["*"]
+  - name: %s
+    allowed_services: []
+    allowed_targets: []`, api.RoleRouter, api.RoleNode)
 	routerBinding := fmt.Sprintf(`  - role: %s
     members: ["group:routers"]`, api.RoleRouter)
 

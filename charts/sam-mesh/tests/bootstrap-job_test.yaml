@@ -51,6 +51,27 @@ tests:
           path: spec.template.spec.containers[0].args[0]
           pattern: '"name": "sam:role:node", "allowed_services": \[\]'
 
+  - it: no identity may enroll as a node by default (fail closed)
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"role":"sam:role:node"'
+
+  - it: node enrollment is granted to exactly the configured members
+    documentSelector:
+      path: kind
+      value: Job
+    set:
+      bootstrap:
+        nodeMembers: ["user:test-user", "group:eng"]
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '\{"members":\["user:test-user","group:eng"\],"role":"sam:role:node"\}'
+
   - it: node role grants only the configured services
     documentSelector:
       path: kind

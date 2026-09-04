@@ -400,6 +400,7 @@ if [[ -z "${MESH_HELPERS_LOADED:-}" ]]; then
       --set console.enabled=false
       --set 'router.externalAddrs={/dns4/sam-router/tcp/4501}'
       --set 'bootstrap.nodeServices={mcp://calculator,mcp://db-agent,mcp://http-tool,mcp://stdio-tool,a2a://echo,system://sam.catalog}'
+      --set 'bootstrap.nodeMembers={user:test-user}'
       --set 'bootstrap.nodeLabels={region=*}')
     if ! "${helm_bin}" "${helm_args[@]}"; then
       # The reused cluster may hold StatefulSets whose immutable spec (e.g.

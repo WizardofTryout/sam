@@ -124,6 +124,10 @@ bindings:
     members: ["user:admin-user"]
   - role: admin
     members: ["user:nodeB"]
+  # This suite permutes service/target grants, not enrollment; every identity
+  # (including the deliberately unknown one) must still get a seat.
+  - role: sam:role:node
+    members: ["sam:system:authenticated"]
 `
 	if err := os.WriteFile(controlPlanePolicyFile, []byte(controlPlanePolicyYAML), 0644); err != nil {
 		t.Fatal(err)

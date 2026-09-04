@@ -500,27 +500,21 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resolvedRoles := resolveRoles(pID.String(), claims, bindings)
-	var hasCapabilityRoles bool
 	var customAccessRoles []string
 	resolvedMap := make(map[string]bool)
 	for _, r := range resolvedRoles {
 		resolvedMap[r] = true
-		if strings.HasPrefix(r, "sam:role:") {
-			hasCapabilityRoles = true
-		} else if r != req.RequestedRole {
+		if !strings.HasPrefix(r, "sam:role:") && r != req.RequestedRole {
 			customAccessRoles = append(customAccessRoles, r)
 		}
 	}
 
-	isAuthorized := false
-	if resolvedMap[req.RequestedRole] {
-		isAuthorized = true
-	} else if req.RequestedRole == api.RoleNode && !hasCapabilityRoles {
-		isAuthorized = true
-	}
-
-	if !isAuthorized {
-		http.Error(w, fmt.Sprintf("requested role %q is not authorized for this identity", req.RequestedRole), http.StatusForbidden)
+	// Enrollment is a policy decision like any other: the requested role must
+	// resolve from an explicit binding. There is deliberately no fallback for
+	// sam:role:node — a mesh that wants open enrollment says so by binding it
+	// to sam:system:authenticated, instead of getting it by omission.
+	if !resolvedMap[req.RequestedRole] {
+		http.Error(w, fmt.Sprintf("requested role %q is not bound to this identity; bind it in mesh policy (to sam:system:authenticated to open enrollment to every authenticated identity)", req.RequestedRole), http.StatusForbidden)
 		return
 	}
 
@@ -743,27 +737,19 @@ func (s *Server) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		resolvedRoles := resolveRoles(pID.String(), claims, bindings)
-		var hasCapabilityRoles bool
 		var customAccessRoles []string
 		resolvedMap := make(map[string]bool)
 		for _, r := range resolvedRoles {
 			resolvedMap[r] = true
-			if strings.HasPrefix(r, "sam:role:") {
-				hasCapabilityRoles = true
-			} else if r != nodeRecord.Role {
+			if !strings.HasPrefix(r, "sam:role:") && r != nodeRecord.Role {
 				customAccessRoles = append(customAccessRoles, r)
 			}
 		}
 
-		isAuthorized := false
-		if resolvedMap[nodeRecord.Role] {
-			isAuthorized = true
-		} else if nodeRecord.Role == api.RoleNode && !hasCapabilityRoles {
-			isAuthorized = true
-		}
-
-		if !isAuthorized {
-			http.Error(w, fmt.Sprintf("role %q is no longer authorized for this identity", nodeRecord.Role), http.StatusForbidden)
+		// Same rule as enrollment, re-evaluated against current policy: a mesh
+		// that unbinds the role revokes the identity's seat at the next refresh.
+		if !resolvedMap[nodeRecord.Role] {
+			http.Error(w, fmt.Sprintf("role %q is no longer bound to this identity", nodeRecord.Role), http.StatusForbidden)
 			return
 		}
 
