@@ -20,7 +20,10 @@ NAMESPACE="sam-kind"
 
 # Same helm fallback as run.sh: CI and dev boxes may only have ./bin/helm.
 HELM="helm"
-command -v helm >/dev/null 2>&1 || HELM="./bin/helm"
+if ! command -v helm >/dev/null 2>&1; then
+  [[ -x "./bin/helm" ]] || { echo "missing prerequisite: helm (install helm or place it in ./bin/helm)" >&2; exit 1; }
+  HELM="./bin/helm"
+fi
 
 echo "== Deploying calc-mcp via charts/sam-node =="
 docker build -t calc-mcp:local development/examples/calc-mcp

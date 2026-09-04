@@ -40,8 +40,9 @@ in a base file and the service description in its own, then pass both:
 The service container and the node share the pod's network, so `target_url`
 points at `127.0.0.1:<port>`. Services declared in `config.services` are
 advertised to the mesh via DHT and gossip; `config.attenuation` narrows what
-the node's credential permits. The config file is read once at node startup —
-the chart rolls the pods on config changes (checksum annotation).
+the node's credential permits. Your `config` values are merged over the chart's
+defaults and rendered as `sam-node.yaml` at startup — the chart rolls the pods
+on config changes (checksum annotation).
 
 ## Values
 
@@ -52,7 +53,7 @@ the chart rolls the pods on config changes (checksum annotation).
 | `apiToken` | `devtoken` | Bearer token for the node's local REST API |
 | `bindAddr` | `127.0.0.1:8080` | Node API bind address (loopback = pod-private) |
 | `extraArgs` | `[]` | Extra sam-node args |
-| `config` | empty services | Rendered verbatim as `sam-node.yaml` |
+| `config` | empty services | Merged over the chart's defaults and rendered as `sam-node.yaml` |
 | `service.image` | `""` | Service container image; empty = bare node |
 | `service.name/command/env/ports/resources` | — | Service container spec |
 | `image.repository/tag/pullPolicy` | `sam-node:local` | Node image |
