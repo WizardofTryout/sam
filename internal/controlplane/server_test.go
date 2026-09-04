@@ -2207,6 +2207,91 @@ func TestAuthDenialPaths(t *testing.T) {
 	})
 }
 
+// TestBanSurvivesKeypairRegeneration pins the fix for the GHSA-cgmg-9xf6-rrgw
+// ban-bypass claim: bans were keyed only on peer_id, which the node itself
+// mints, so a banned operator regenerated a keypair and re-enrolled. Revoking
+// now also bans the OIDC identity (issuer|subject) and /register checks both.
+func TestBanSurvivesKeypairRegeneration(t *testing.T) {
+	issuer, mintToken := startCustomMockOIDC(t)
+	srv, store, baseURL := setupTestServer(t, issuer)
+	defer func() {
+		_ = srv.Close()
+		_ = store.Close()
+	}()
+	srv.config.AdminToken = "super-secret-admin-token"
+
+	ctx := context.Background()
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	if err := store.SaveMeshPolicy(ctx, nil, []*api.PolicyBinding{
+		{Role: api.RoleNode, Members: []string{api.SystemAuthenticated}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	enrollKey := func(t *testing.T, priv crypto.PrivKey, sub string) int {
+		t.Helper()
+		pID, err := peer.IDFromPrivateKey(priv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pubBytes, err := crypto.MarshalPublicKey(priv.GetPublic())
+		if err != nil {
+			t.Fatal(err)
+		}
+		reqData, _ := proto.Marshal(&api.EnrollRequest{
+			Jwt:           mintToken(map[string]interface{}{"sub": sub}),
+			PeerId:        pID.String(),
+			PublicKey:     pubBytes,
+			RequestedRole: api.RoleNode,
+		})
+		resp, err := client.Post(baseURL+"/register", "application/x-protobuf", bytes.NewReader(reqData))
+		if err != nil {
+			t.Fatalf("/register failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		return resp.StatusCode
+	}
+	newKey := func(t *testing.T) crypto.PrivKey {
+		t.Helper()
+		priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return priv
+	}
+
+	bannedKey := newKey(t)
+	if status := enrollKey(t, bannedKey, "ban-me"); status != http.StatusOK {
+		t.Fatalf("initial enrollment: got %d, want 200", status)
+	}
+
+	bannedPeer, _ := peer.IDFromPrivateKey(bannedKey)
+	revokeData, _ := proto.Marshal(&api.TokenRevokeRequest{PeerId: bannedPeer.String()})
+	req, _ := http.NewRequest("POST", baseURL+"/admin/revoke", bytes.NewReader(revokeData))
+	req.Header.Set("Authorization", "Bearer super-secret-admin-token")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("/admin/revoke failed: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/admin/revoke: got %d, want 200", resp.StatusCode)
+	}
+
+	if status := enrollKey(t, bannedKey, "ban-me"); status != http.StatusForbidden {
+		t.Errorf("re-enrollment with the banned keypair: got %d, want 403", status)
+	}
+	// Same identity behind a fresh keypair: the bypass this test exists for.
+	if status := enrollKey(t, newKey(t), "ban-me"); status != http.StatusForbidden {
+		t.Errorf("re-enrollment with a fresh keypair: got %d, want 403", status)
+	}
+	// An unrelated identity keeps working.
+	if status := enrollKey(t, newKey(t), "somebody-else"); status != http.StatusOK {
+		t.Errorf("unrelated identity: got %d, want 200", status)
+	}
+}
+
 // TestBootstrapTokenOwnerPropagatesToNode ensures a node enrolled with a user-owned
 // bootstrap token is attributed to that user, which is what makes the console's
 // per-user node listing work.

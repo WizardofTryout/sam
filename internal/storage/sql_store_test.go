@@ -326,6 +326,53 @@ func TestNodeEnrollmentOps(t *testing.T) {
 	}
 }
 
+func TestIdentityBanOps(t *testing.T) {
+	store := newTestStore(t)
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	identity := "http://issuer.example|banned-sub"
+
+	banned, err := store.IsIdentityBanned(ctx, identity)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if banned {
+		t.Fatalf("expected identity not banned by default")
+	}
+
+	if err := store.SetIdentityBanned(ctx, identity, true); err != nil {
+		t.Fatalf("failed to ban identity: %v", err)
+	}
+	// Banning twice must not error: two revoked nodes can share one identity.
+	if err := store.SetIdentityBanned(ctx, identity, true); err != nil {
+		t.Fatalf("re-banning identity: %v", err)
+	}
+
+	banned, err = store.IsIdentityBanned(ctx, identity)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !banned {
+		t.Fatalf("expected identity to be banned")
+	}
+
+	if err := store.SetIdentityBanned(ctx, identity, false); err != nil {
+		t.Fatalf("failed to unban identity: %v", err)
+	}
+	banned, err = store.IsIdentityBanned(ctx, identity)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if banned {
+		t.Fatalf("expected identity to be unbanned")
+	}
+
+	if err := store.SetIdentityBanned(ctx, "", true); err == nil {
+		t.Fatalf("expected an error banning the empty identity")
+	}
+}
+
 func TestRouterLeaseOps(t *testing.T) {
 	store := newTestStore(t)
 	defer func() { _ = store.Close() }()

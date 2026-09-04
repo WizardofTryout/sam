@@ -169,6 +169,14 @@ type Store interface {
 	// IsNodeBanned checks if a node is currently banned.
 	IsNodeBanned(ctx context.Context, peerID string) (bool, error)
 
+	// SetIdentityBanned bans or unbans an enrolled OIDC identity, keyed as
+	// "issuer|subject". A node ban is keyed on a self-generated peer id, so
+	// this is what makes a ban survive keypair regeneration.
+	SetIdentityBanned(ctx context.Context, identity string, banned bool) error
+
+	// IsIdentityBanned checks if an identity is currently banned.
+	IsIdentityBanned(ctx context.Context, identity string) (bool, error)
+
 	// UpsertRouterLease updates or creates a lease for a sam-router.
 	UpsertRouterLease(ctx context.Context, lease *RouterLease) error
 

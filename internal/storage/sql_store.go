@@ -351,6 +351,24 @@ var migrations = []migration{
 			`ALTER TABLE enrollment_requests ADD COLUMN labels_json TEXT DEFAULT '' NOT NULL`,
 		},
 	},
+	{
+		// A ban must outlive the keypair that carried it: banning a node also
+		// bans the enrolled OIDC identity (issuer|subject), which a fresh
+		// peer id cannot shed.
+		version: 8,
+		postgres: []string{
+			`CREATE TABLE IF NOT EXISTS banned_identities (
+				identity VARCHAR(512) PRIMARY KEY,
+				banned_at BIGINT NOT NULL
+			)`,
+		},
+		sqlite: []string{
+			`CREATE TABLE IF NOT EXISTS banned_identities (
+				identity TEXT PRIMARY KEY,
+				banned_at BIGINT NOT NULL
+			)`,
+		},
+	},
 }
 
 func (s *SQLStore) initSchema() error {
@@ -691,6 +709,35 @@ func (s *SQLStore) IsNodeBanned(ctx context.Context, peerID string) (bool, error
 		return false, err
 	}
 	return banned, nil
+}
+
+// SetIdentityBanned implements Store.
+func (s *SQLStore) SetIdentityBanned(ctx context.Context, identity string, banned bool) error {
+	if identity == "" {
+		return fmt.Errorf("identity cannot be empty")
+	}
+	if banned {
+		query := s.rebind(`INSERT INTO banned_identities (identity, banned_at) VALUES (?, ?) ON CONFLICT (identity) DO NOTHING`)
+		_, err := s.db.ExecContext(ctx, query, identity, time.Now().Unix())
+		return err
+	}
+	query := s.rebind(`DELETE FROM banned_identities WHERE identity = ?`)
+	_, err := s.db.ExecContext(ctx, query, identity)
+	return err
+}
+
+// IsIdentityBanned implements Store.
+func (s *SQLStore) IsIdentityBanned(ctx context.Context, identity string) (bool, error) {
+	query := s.rebind(`SELECT 1 FROM banned_identities WHERE identity = ?`)
+	var one int
+	err := s.db.QueryRowContext(ctx, query, identity).Scan(&one)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // UpsertRouterLease implements Store.

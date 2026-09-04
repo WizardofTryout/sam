@@ -470,6 +470,29 @@ func (s *Server) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A ban names the device key and the identity behind it; check both, or
+	// a banned node re-enrolls from a freshly generated keypair.
+	if banned, err := s.store.IsNodeBanned(ctx, req.PeerId); err != nil {
+		logger.Errorf("Failed to check node ban for %s: %v", req.PeerId, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	} else if banned {
+		logger.Warnw("Banned node attempted enrollment", "peer_id", req.PeerId)
+		http.Error(w, "Node is banned", http.StatusForbidden)
+		return
+	}
+	if key := oidcIdentityKey(claims); key != "" {
+		if banned, err := s.store.IsIdentityBanned(ctx, key); err != nil {
+			logger.Errorf("Failed to check identity ban for %s: %v", req.PeerId, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		} else if banned {
+			logger.Warnw("Banned identity attempted enrollment", "peer_id", req.PeerId, "identity", key)
+			http.Error(w, "Identity is banned", http.StatusForbidden)
+			return
+		}
+	}
+
 	// Mesh policy is distributed dynamically to the target nodes, no need to inject into token.
 
 	// Fetch current signing private key
@@ -1229,6 +1252,19 @@ func (s *Server) HandleEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Bootstrap enrollments carry no OIDC identity, but the device-key ban
+	// still applies, and before the existing-request lookup: a banned node
+	// must not replay its old approved enrollment either.
+	if banned, err := s.store.IsNodeBanned(ctx, req.PeerId); err != nil {
+		logger.Errorf("Failed to check node ban for %s: %v", req.PeerId, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	} else if banned {
+		logger.Warnw("Banned node attempted bootstrap enrollment", "peer_id", req.PeerId)
+		s.writeEnrollError(w, api.EnrollmentStatus_ENROLLMENT_STATUS_REJECTED, "Node is banned")
+		return
+	}
+
 	// 2. Check for existing enrollment request
 	existingReq, err := s.store.GetEnrollmentRequest(ctx, req.PeerId)
 	if err == nil {
@@ -1798,7 +1834,7 @@ func (s *Server) HandleAdminRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve the node from storage to verify it exists
-	_, err = s.store.GetNode(ctx, req.PeerId)
+	node, err := s.store.GetNode(ctx, req.PeerId)
 	if err == storage.ErrNotFound {
 		http.Error(w, "Node not found", http.StatusNotFound)
 		return
@@ -1808,8 +1844,7 @@ func (s *Server) HandleAdminRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set node as banned (revoked)
-	if err := s.store.SetNodeBanned(ctx, req.PeerId, true); err != nil {
+	if err := s.banNode(ctx, node); err != nil {
 		logger.Errorf("Failed to ban/revoke node %s: %v", req.PeerId, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -2086,7 +2121,7 @@ func (s *Server) HandleUserRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.SetNodeBanned(ctx, peerID, true); err != nil {
+	if err := s.banNode(ctx, node); err != nil {
 		logger.Errorf("Failed to revoke node: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -2098,6 +2133,40 @@ func (s *Server) HandleUserRevoke(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("Node revoked successfully"))
+}
+
+// oidcIdentityKey names an enrolled OIDC identity independently of any
+// keypair: issuer and subject, the pair the issuer promises stable. Empty
+// when there is no subject (e.g. bootstrap enrollments).
+func oidcIdentityKey(claims jwt.MapClaims) string {
+	if claims == nil {
+		return ""
+	}
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return ""
+	}
+	iss, _ := claims["iss"].(string)
+	return iss + "|" + sub
+}
+
+// banNode bans the device key and, when the record carries OIDC claims, the
+// enrolled identity behind it, so the ban survives keypair regeneration.
+func (s *Server) banNode(ctx context.Context, node *storage.EnrolledNode) error {
+	if err := s.store.SetNodeBanned(ctx, node.PeerID, true); err != nil {
+		return err
+	}
+	if node.ClaimsJSON == "" {
+		return nil
+	}
+	var claims jwt.MapClaims
+	if err := json.Unmarshal([]byte(node.ClaimsJSON), &claims); err != nil {
+		return fmt.Errorf("stored claims for %s are unreadable: %w", node.PeerID, err)
+	}
+	if key := oidcIdentityKey(claims); key != "" {
+		return s.store.SetIdentityBanned(ctx, key, true)
+	}
+	return nil
 }
 
 // allowedLabelPatterns collects the label grants of every role an identity
