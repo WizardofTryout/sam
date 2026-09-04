@@ -41,12 +41,22 @@ BOOTSTRAP_TOKEN="$(printf '%s' "${TOKEN_RESPONSE}" | jq -r '.token // empty' 2>/
 
 echo "Enrolling local ./bin/sam-node into the mesh control plane at ${CONTROL_PLANE_URL}…"
 echo "  MCP/sidecar API on 127.0.0.1:9099"
+
+# Throwaway identity per run: the default data-dir keeps the biscuit from a
+# previous cluster, and enrolling with it against a fresh control plane fails.
+DATA_DIR="$(mktemp -d)"
+cleanup() { [[ -n "${NODE_PID:-}" ]] && kill "${NODE_PID}" 2>/dev/null || true; rm -rf "${DATA_DIR}"; }
+trap cleanup EXIT INT TERM
+
 export SAM_API_TOKEN=devtoken
-exec ./bin/sam-node run \
+./bin/sam-node run \
   --control-plane "${CONTROL_PLANE_URL}" \
   --bootstrap-token "${BOOTSTRAP_TOKEN}" \
   --listen /ip4/0.0.0.0/tcp/0 \
   --bind-addr 127.0.0.1:9099 \
   --discovery-interval 200ms \
   --router-connect-timeout 10s \
-  "$@"
+  --data-dir "${DATA_DIR}" \
+  "$@" &
+NODE_PID=$!
+wait "${NODE_PID}"
