@@ -80,20 +80,21 @@ that brings the agent up with one command.
 line in `development/examples/chat-a2a/Dockerfile` before building (a free
 Google AI Studio key is fine for the demo).
 
-### 2. Mesh layout
-
-Host the agent on one node in `development/kind/mesh-config.yaml`:
-
-```yaml
-node-a:            # bare node
-node-b: chat-a2a   # the A2A agent
-```
-
-### 3. Bring the mesh up and enroll a local caller node
+### 2. Bring the mesh up and deploy the agent
 
 ```bash
 make build            # builds ./bin/sam-node (once)
-make kind-up          # control plane + router + agent (node-b)
+make kind-up          # control plane + router (no sam-nodes yet)
+docker build -t chat-a2a:local development/examples/chat-a2a
+kind load docker-image --name sam-kind chat-a2a:local
+helm --kube-context kind-sam-kind -n sam-kind install chat-a2a charts/sam-node \
+  -f development/kind/sam-node.values.yaml \
+  -f development/examples/chat-a2a/values.yaml
+```
+
+### 3. Enroll a local caller node
+
+```bash
 make kind-local-node  # local sam-node enrolled in the mesh — LEAVE RUNNING
 ```
 
