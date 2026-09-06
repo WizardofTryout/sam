@@ -2267,3 +2267,151 @@ func TestBootstrapTokenOwnerPropagatesToNode(t *testing.T) {
 		t.Errorf("enrolled node owner = %q, want %q", enrolled.OwnerID, ownerSub)
 	}
 }
+
+// TestInitRegisterRoutesEmbedded pins the embedder seam used by single-binary
+// distributions: Init + RegisterRoutes on an externally owned mux/listener,
+// with no OIDC issuer configured, and a Close that never saw Start.
+func TestInitRegisterRoutesEmbedded(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "cp-embedded.db")
+	store, err := storage.NewSQLStore("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	srv, err := NewServer(Options{
+		DriverName:       "sqlite",
+		DataSourceName:   dbPath,
+		AllowedAudiences: []string{"sam-mesh-audience"},
+	}, store)
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	if err := srv.Init(); err != nil {
+		t.Fatalf("Init() with empty OIDC issuer failed: %v", err)
+	}
+	if _, _, err := store.GetCurrentKey(context.Background()); err != nil {
+		t.Fatalf("Init() did not bootstrap the signing keyring: %v", err)
+	}
+	if got := srv.Addr(); got != "" {
+		t.Errorf("Addr() without an owned listener = %q, want empty", got)
+	}
+
+	mux := http.NewServeMux()
+	srv.RegisterRoutes(mux)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	for _, path := range []string{"/healthz", "/readyz", "/keys", "/info"} {
+		resp, err := client.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", path, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %s status = %s, want 200", path, resp.Status)
+		}
+		if path != "/info" {
+			_ = resp.Body.Close()
+			continue
+		}
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			t.Fatalf("failed to read /info body: %v", err)
+		}
+		var info api.ControlPlaneInfoResponse
+		if err := proto.Unmarshal(body, &info); err != nil {
+			t.Fatalf("failed to unmarshal ControlPlaneInfoResponse: %v", err)
+		}
+		if info.OidcIssuer != "" {
+			t.Errorf("/info issuer = %q, want empty (no OIDC configured)", info.OidcIssuer)
+		}
+	}
+
+	// Close must shut down the rotation loop cleanly even though the server
+	// never owned an http.Server or listener.
+	if err := srv.Close(); err != nil {
+		t.Fatalf("Close() without Start failed: %v", err)
+	}
+}
+
+// TestAdminBootstrapTokensList pins the admin listing surface used by
+// `sam-one token list`: created tokens show up, and the list is admin-gated.
+func TestAdminBootstrapTokensList(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "cp-admin-tokens.db")
+	store, err := storage.NewSQLStore("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	srv, err := NewServer(Options{
+		DriverName:       "sqlite",
+		DataSourceName:   dbPath,
+		AdminToken:       "test-admin-token",
+		AllowedAudiences: []string{"sam-mesh-audience"},
+	}, store)
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	srv.RegisterRoutes(mux)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// Create one token through the existing POST surface.
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/admin/bootstrap-tokens",
+		strings.NewReader(`{"role":"sam:role:node","ttl_hours":1,"max_usages":3,"description":"cli test"}`))
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("POST /admin/bootstrap-tokens failed: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /admin/bootstrap-tokens status = %s, want 201", resp.Status)
+	}
+
+	// GET with the admin token returns it.
+	req, err = http.NewRequest(http.MethodGet, ts.URL+"/admin/bootstrap-tokens", nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("GET /admin/bootstrap-tokens failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /admin/bootstrap-tokens status = %s, want 200", resp.Status)
+	}
+	var list []storage.BootstrapToken
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("failed to decode token list: %v", err)
+	}
+	_ = resp.Body.Close()
+	if len(list) != 1 {
+		t.Fatalf("token list length = %d, want 1", len(list))
+	}
+	if list[0].Role != "sam:role:node" || list[0].MaxUsages != 3 || list[0].Description != "cli test" {
+		t.Errorf("unexpected token record: %+v", list[0])
+	}
+
+	// GET without credentials is refused.
+	resp, err = client.Get(ts.URL + "/admin/bootstrap-tokens")
+	if err != nil {
+		t.Fatalf("unauthenticated GET failed: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("unauthenticated GET status = %s, want 401", resp.Status)
+	}
+}

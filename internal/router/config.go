@@ -16,6 +16,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/sam/api"
@@ -44,6 +45,14 @@ type Options struct {
 	HighWaterMark      int
 	// RequiredRole restricts enrollment and startup to only accept tokens containing this role.
 	RequiredRole string
+	// HTTPFallbackHandler, when set, serves ordinary (non-WebSocket-upgrade)
+	// HTTP requests arriving on the router's WebSocket listen addrs, letting a
+	// single port carry both libp2p and REST traffic (single-port mode).
+	HTTPFallbackHandler http.Handler
+	// ConnsPerSourceIP overrides libp2p's per-source-IP inbound connection
+	// cap (default: 8) when > 0. Raise it when the listener sits behind a
+	// TLS-terminating proxy or NAT, where many peers share a few source IPs.
+	ConnsPerSourceIP int
 }
 
 // Default sets default values for options.
