@@ -81,11 +81,21 @@ teardown() {
 
   # The label the provider attests (region=eu) is admitted end to end over
   # the real attestation chain — same stock client, labels via header.
+  # Retried: the gate fail-closes a slow biscuit-fetch handshake into the
+  # same 403 as a denial ("labels unverifiable: ... context deadline
+  # exceeded", seen under CI load); a genuine denial fails all attempts.
   echo "[$(date +%T)] Labelled send (region=eu) must be admitted"
-  run docker run --rm --network "${MESH_NETWORK}" \
-    -e SAM_API_TOKEN="secret-token" \
-    -e SAM_REQUIRED_LABELS="region=eu" \
-    "${A2A_ECHO_IMAGE}" python3 /workspace/client.py "${mesh_base}" "hello eu"
+  local attempt
+  for attempt in 1 2 3; do
+    run docker run --rm --network "${MESH_NETWORK}" \
+      -e SAM_API_TOKEN="secret-token" \
+      -e SAM_REQUIRED_LABELS="region=eu" \
+      "${A2A_ECHO_IMAGE}" python3 /workspace/client.py "${mesh_base}" "hello eu"
+    [[ "$status" -eq 0 ]] && break
+    echo "labelled attempt ${attempt} failed, node-1 label gate verdicts:"
+    docker logs "${MESH_PREFIX}-node-1" 2>&1 | grep -F '[A2A]' || true
+    sleep 2
+  done
   echo "labelled client output: $output"
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"agent> echo: hello eu"* ]]
