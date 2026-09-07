@@ -166,10 +166,10 @@ jobs:
             echo "| Console | ${URL}/console |"
             echo "| Built from | \`${REF_NAME}\` @ \`${GITHUB_SHA}\` |"
             echo
-            echo "Join a node:"
+            echo "Join a node (socket-only local API; or export SAM_API_TOKEN instead of --bind-addr \"\"):"
             echo
             echo '```bash'
-            echo "sam-node run --control-plane ${URL} --bootstrap-token <JOIN_TOKEN>"
+            echo "sam-node run --control-plane ${URL} --bootstrap-token <JOIN_TOKEN> --bind-addr \"\""
             echo '```'
             echo
           } >> "$GITHUB_STEP_SUMMARY"
