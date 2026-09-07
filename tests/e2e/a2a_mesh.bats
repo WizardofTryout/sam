@@ -87,6 +87,10 @@ teardown() {
     -e SAM_REQUIRED_LABELS="region=eu" \
     "${A2A_ECHO_IMAGE}" python3 /workspace/client.py "${mesh_base}" "hello eu"
   echo "labelled client output: $output"
+  if [[ "$status" -ne 0 ]]; then
+    echo "node-1 label gate verdicts:"
+    docker logs "${MESH_PREFIX}-node-1" 2>&1 | grep -F '[A2A]' || true
+  fi
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"agent> echo: hello eu"* ]]
 
