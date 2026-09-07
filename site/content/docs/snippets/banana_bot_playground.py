@@ -31,12 +31,18 @@ class SamClient:
             # The SDK's SSE-friendly defaults; httpx's default 5s read timeout drops the stream.
             timeout=httpx.Timeout(30.0, read=300.0),
         )
-        self._sse_cm = streamable_http_client(self.server_url, http_client=self._http_client)
-        res = await self._sse_cm.__aenter__()
-        read_stream, write_stream = res[0], res[1]
-        self.session = ClientSession(read_stream, write_stream)
-        await self.session.__aenter__()
-        await self.session.initialize()
+        try:
+            self._sse_cm = streamable_http_client(self.server_url, http_client=self._http_client)
+            res = await self._sse_cm.__aenter__()
+            read_stream, write_stream = res[0], res[1]
+            self.session = ClientSession(read_stream, write_stream)
+            await self.session.__aenter__()
+            await self.session.initialize()
+        except Exception:
+            # The retry loop in __aenter__ would otherwise orphan this
+            # attempt's http client and half-entered streams.
+            await self.close()
+            raise
 
     async def close(self):
         if self.session:
