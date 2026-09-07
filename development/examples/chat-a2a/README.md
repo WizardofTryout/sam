@@ -10,20 +10,16 @@ Edit `Dockerfile` and replace `<API_KEY>` in `ENV GEMINI_API_KEY=<API_KEY>`
 (same pattern as `gemini-buddy-mcp`). Optionally override the model with
 `GEMINI_MODEL` (default `models/gemini-3.5-flash-lite`).
 
-## 2. Host the agent on a mesh node
-
-Assign it in `development/kind/mesh-config.yaml`:
-
-```yaml
-node-a:
-node-b: chat-a2a
-```
-
-Then bring the mesh up:
+## 2. Bring the mesh up and deploy the agent
 
 ```sh
-make build
-make kind-up
+make build            # builds ./bin/sam-node (once)
+make kind-up          # control plane + router (no sam-nodes yet)
+docker build -t chat-a2a:local development/examples/chat-a2a
+kind load docker-image --name sam-kind chat-a2a:local
+helm --kube-context kind-sam-kind -n sam-kind install chat-a2a charts/sam-node \
+  -f development/kind/sam-node.values.yaml \
+  -f development/examples/chat-a2a/values.yaml
 ```
 
 ## 3. Enroll a local caller node

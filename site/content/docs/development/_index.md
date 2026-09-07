@@ -88,10 +88,10 @@ make test-e2e-container
 For end-to-end integration testing in a local Kubernetes environment, the repository provides `make` targets that stand up a complete mesh in `kind` with a single command:
 
 ```bash
-make kind-up          # create the sam-kind cluster, build+load images, deploy control-plane + router + nodes
+make kind-up          # create the sam-kind cluster, build+load images, deploy the sam infrastructure
 make kind-local-node  # enroll a locally-built ./bin/sam-node into the mesh
 make kind-e2e-mesh    # run the end-to-end discover-and-call check
 make kind-down        # tear the cluster down
 ```
 
-`make kind-up` builds the `sam-control-plane:local`, `sam-router:local`, and `sam-node:local` images, creates a `sam-kind` cluster, and deploys the control-plane and router plus the nodes declared in `development/kind/mesh-config.yaml`. See the [Kubernetes Deployment and Local Testing Guide](kubernetes-deployment/#1-local-testing-with-kind) for details.
+`make kind-up` builds the `sam-control-plane:local`, `sam-router:local`, `sam-node:local` and `sam-console:local` images, creates a `sam-kind` cluster, and deploys the control plane, router, console and Dex — no sam-nodes. Deploy services with `charts/sam-node`; see the [Kubernetes Deployment and Local Testing Guide](kubernetes-deployment/#1-local-testing-with-kind) for details.

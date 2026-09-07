@@ -1,0 +1,12 @@
+config:
+  version: v1alpha1
+  attenuation:
+    policies: []
+  services:
+    - type: mcp
+      name: greeter
+      description: Friendly greetings and shouts
+      target_url: http://127.0.0.1:7778/mcp
+service:
+  name: greeter-mcp
+  image: greeter-mcp:local

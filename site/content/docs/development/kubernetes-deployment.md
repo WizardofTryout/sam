@@ -11,7 +11,7 @@ This guide explains how to deploy the SAM control plane and router in a Kubernet
 
 ## 1. Local Testing with Kind
 
-The repository ships a one-command local mesh under `development/kind/`, driven by `make` targets. This is the fastest way to get a running control plane, router and a few nodes on your machine.
+The repository ships a one-command local mesh under `development/kind/`, driven by `make` targets. This is the fastest way to get a running control plane, router and console on your machine — ready for you to deploy services onto.
 
 ### Automated Mesh (Recommended)
 
@@ -19,10 +19,17 @@ The repository ships a one-command local mesh under `development/kind/`, driven 
 make kind-up
 ```
 
-This creates a `sam-kind` cluster (one control-plane plus three workers — one labeled `sam-role: control-plane`, and one each for `node-a` and `node-b`), builds the `sam-control-plane:local`, `sam-router:local`, and `sam-node:local` images, loads them into the cluster, and deploys:
+This creates a `sam-kind` cluster (one control-plane plus two workers — one
+labeled `sam-role: control-plane` for the router), builds the
+`sam-control-plane:local`, `sam-router:local`, `sam-node:local` and
+`sam-console:local` images, loads them into the cluster, and deploys:
 
 - The **control plane**, configured to trust the cluster's own OIDC issuer.
-- Two **nodes** declared in `development/kind/mesh-config.yaml` (`node-a` and `node-b`), both **bare** by default — assign services to suit what you're testing.
+- The **console**.
+- **Dex**.
+- The **router**.
+- **No sam-nodes.** The mesh comes up empty; put services on it with the
+  `charts/sam-node` chart (next section) or enroll a local node.
 
 In-cluster nodes authenticate to the control plane via **Workload Identity Federation** (projected ServiceAccount tokens), so no static secrets or mock OIDC provider are needed.
 
@@ -33,7 +40,7 @@ The mesh is exposed through Gateway API LoadBalancer addresses, so there are no 
 - **Dex** on its own address, deployed from `development/kind/dex.yaml` rather than the chart — Dex is an independent component the chart no longer bundles.
 - The **router** at its own node's IP on port 4501, TCP **and** QUIC, announced from `status.hostIP`.
 
-Once everything is up, `make kind-up` opens a tmux session with live per-pod logs (control plane, router and each node in its own pane). Manage the mesh with:
+Once everything is up, `make kind-up` opens a tmux session with live per-pod logs (control plane and router, each in its own pane). Manage the mesh with:
 
 ```bash
 make kind-up ARGS=-s     # bring the mesh up without attaching the log view
@@ -41,65 +48,77 @@ make kind-logs           # (re)attach the live-logs tmux session
 make kind-down           # delete the sam-kind cluster and stop cloud-provider-kind
 ```
 
-### Mesh Layout (`mesh-config.yaml`)
+### Deploying a Service
 
-The nodes that make up the dev mesh are declared in `development/kind/mesh-config.yaml`. Each entry maps a node to an optional service:
+A service is any backend a node advertises to the mesh (`type: mcp` or
+`type: inference`). In Kubernetes a service ships as a **`charts/sam-node`
+release**: one pod holding your service container and a `sam-node` sidecar
+that advertises it. The repository ships ready-made examples under
+`development/examples/`; each is a `Dockerfile` plus a `values.yaml`
+describing only the service — kind-wide wiring (control plane URL, fast
+discovery) lives once in `development/kind/sam-node.values.yaml` and is
+stacked underneath with a second `-f`.
 
-```yaml
-# node -> service. A blank value means a bare node (no service, e.g. a caller).
-# Set a value to host a service on that node; the value is a folder path under
-# development/examples/, e.g:
-#   node-a: calc-mcp
-#   node-b: code-reviewer-pool/reviewer
-# All nodes ship bare by default — assign services to suit what you're testing.
-node-a:
-node-b:
+Deploy one (calc-mcp) into the running kind mesh:
+
+```bash
+docker build -t calc-mcp:local development/examples/calc-mcp
+kind load docker-image --name sam-kind calc-mcp:local
+helm --kube-context kind-sam-kind -n sam-kind install calc-mcp charts/sam-node \
+  -f development/kind/sam-node.values.yaml \
+  -f development/examples/calc-mcp/values.yaml
 ```
 
-- The key is the node's name. The cluster currently ships with a control plane and router plus these **two** agent nodes, both bare by default; each is pinned to a matching worker via the `sam-role` labels in `kind-config.yaml`.
-- A **blank** value is a bare node — a `sam-node` with no local service, useful as a caller/consumer.
-- A **non-blank** value is a folder name under `development/examples/`. That service is built and deployed as a **sidecar** next to the node, and the node is configured to advertise it to the mesh.
+`development/deploy-kind-service.sh` wraps those commands (as
+`helm upgrade --install`, plus a rollout wait) and echoes each one as it
+runs, so deploying — or redeploying after a code change — is one line. It
+takes a path to any directory holding a `Dockerfile` and a `values.yaml`,
+and extra args pass through to helm:
 
-When a node has a service, `make kind-up` builds the service image from its `Dockerfile`, loads it into the cluster, and mounts the service's `sam-node-config.yaml` into the node. Because `make kind-up` only runs against a fresh cluster (it refuses if `sam-kind` already exists), **services are (re)deployed on cluster recreation** — after editing `mesh-config.yaml` or a service, run `make kind-down && make kind-up` to pick up the change.
+```bash
+./development/deploy-kind-service.sh development/examples/calc-mcp
+./development/deploy-kind-service.sh development/examples/code-reviewer-pool/reviewer --set replicaCount=3
+./development/deploy-kind-service.sh ~/src/my-service
+# same service as a second, differently-labeled node:
+./development/deploy-kind-service.sh development/examples/calc-mcp --release-name calc-b \
+  --set-json 'extraArgs=["--discovery-interval=200ms","--labels=region=us-east-1"]'
+```
 
-### Adding and Testing a New Service
+To write your own service, copy an example folder: a backend listening on a
+local port, a `Dockerfile`, and a `values.yaml` declaring the service —
 
-A service is any backend a node advertises to the mesh. Its kind is set by the `type` field in `sam-node-config.yaml`. SAM currently supports `mcp` (an MCP server) and `inference` (an LLM inference endpoint). The repository ships example MCP services under `development/examples/` (`calc-mcp`, `greeter-mcp`, `code-reviewer-pool/reviewer`, and `everything-mcp`) which are the easiest starting point. Using `calc-mcp` as a template:
+```yaml
+config:
+  version: v1alpha1
+  attenuation:
+    policies: []
+  services:
+    - type: mcp
+      name: my-service
+      description: What it does
+      target_url: http://127.0.0.1:7779/mcp
+service:
+  name: my-mcp
+  image: my-mcp:local
+```
 
-1. **Create the service folder** `development/examples/my-mcp/` with:
-   - The service backend (e.g. `my_server.py`) listening on a local port, plus a `Dockerfile` and any `requirements.txt`.
-   - A `sam-node-config.yaml` declaring the service. Set `type` to the service kind and point `target_url` at the backend's local port:
-     ```yaml
-     version: "v1alpha1"
-     attenuation:
-       policies:
-     services:
-       - type: "mcp"
-         name: "my-service"
-         description: "What it does"
-         target_url: "http://127.0.0.1:7779/mcp"
-     ```
-     The sidecar and `sam-node` share the pod's network, so `target_url` is always `127.0.0.1:<port>`, where `<port>` matches the port your service listens on.
+The service container and `sam-node` share the pod's network, so `target_url`
+is always `127.0.0.1:<port>`. Iterate with `docker build … && kind load … &&
+helm upgrade calc-mcp charts/sam-node -f … -f …` — the chart rolls the pods
+on config changes. Remove a service with `helm uninstall`.
 
-2. **Assign it to a node** in `mesh-config.yaml` — set the value on a free node slot (`node-a` or `node-b`):
-   ```yaml
-   node-a: my-mcp
-   ```
-   > [!NOTE]
-   > There are two node slots because `kind-config.yaml` defines two workers labeled `sam-role: node-a|node-b`. To host more than two services at once, add a matching labeled worker there too.
+Discover and call it from another node — enroll a local node and use the MCP
+client:
 
-3. **Recreate the cluster** so the new service is built and deployed:
-   ```bash
-   make kind-down && make kind-up
-   ```
+```bash
+make kind-local-node
+# in another shell:
+./bin/mcp-client -url http://127.0.0.1:9099/mcp -token devtoken -tool find_remote_tools -args '{}'
+```
 
-4. **Discover and call it** from another node — enroll a local node and use the MCP client:
-   ```bash
-   make kind-local-node
-   # in another shell:
-   ./bin/mcp-client -url http://127.0.0.1:9099/mcp -token devtoken -tool find_remote_tools -args '{}'
-   ```
-   `find_remote_tools` lists the discovered tools (e.g. `mcp://my-service/...`) and the peer hosting them; pass that `peer_id` and `tool_name` to `call_remote_tool` to invoke it.
+`find_remote_tools` lists the discovered tools (e.g. `mcp://my-service/...`)
+and the peer hosting them; pass that `peer_id` and `tool_name` to
+`call_remote_tool` to invoke it.
 
 ### Enrolling a Local Node
 
@@ -110,11 +129,9 @@ make build            # produce ./bin/sam-node
 make kind-local-node
 ```
 
-This mints a bootstrap token through the control plane's `/admin` API and runs `./bin/sam-node` against the control plane's gateway address — the same credential and path a real external node uses — exposing its MCP API on `127.0.0.1:9099` with the API token `devtoken`. Extra flags pass through via `ARGS`, e.g. to host an example service:
-
-```bash
-make kind-local-node ARGS="--config development/examples/calc-mcp/sam-node-config.yaml"
-```
+This mints a bootstrap token through the control plane's `/admin` API and runs `./bin/sam-node` against the control plane's gateway address — the same credential and path a real external node uses — exposing its MCP API on `127.0.0.1:9099` with the API token `devtoken`. Extra flags pass through via `ARGS`, e.g. `make kind-local-node
+ARGS="--config my-node.yaml"` to host a service from a local config file
+(same schema as the `config:` block in a `charts/sam-node` values file).
 
 You can then drive it with the bundled MCP client:
 
@@ -127,17 +144,11 @@ You can then drive it with the bundled MCP client:
 To verify the full discovery-and-call path against a freshly built mesh:
 
 ```bash
+make kind-up ARGS="-s"
 make kind-e2e-mesh
 ```
 
-This enrolls a local node, waits for it to discover `mcp://calculator/add`, calls `add(2, 3)`, and asserts the result is `5`. Because nodes ship bare by default, the check needs a `calc-mcp` service on the mesh — bring the mesh up with the bundled e2e layout, which pins it:
-
-```bash
-MESH_CONFIG=development/kind/mesh-config.e2e.yaml make kind-up ARGS="-s"
-make kind-e2e-mesh
-```
-
-`MESH_CONFIG` overrides which layout `make kind-up` deploys (default: `mesh-config.yaml`); `mesh-config.e2e.yaml` assigns `calc-mcp` to `node-b`.
+`kind-e2e-mesh` deploys `calc-mcp` as a `charts/sam-node` release, enrolls a local node, waits for it to discover `mcp://calculator/add`, calls `add(2, 3)`, and asserts the result is `5`.
 
 ---
 

@@ -1,8 +1,0 @@
-version: "v1alpha1"
-attenuation:
-  policies: []
-services:
-  - type: "mcp"
-    name: "everything"
-    description: "MCP everything test server (tools, resources, prompts)"
-    target_url: "http://127.0.0.1:3001/mcp"

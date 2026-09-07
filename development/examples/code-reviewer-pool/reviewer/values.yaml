@@ -1,0 +1,12 @@
+config:
+  version: v1alpha1
+  attenuation:
+    policies: []
+  services:
+    - type: mcp
+      name: code-reviewer
+      description: Reviews code snippets via a Gemini-backed agent
+      target_url: http://127.0.0.1:7779/mcp
+service:
+  name: reviewer
+  image: reviewer:local

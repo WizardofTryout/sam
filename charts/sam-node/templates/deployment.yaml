@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sam-node.fullname" . }}
+  labels:
+    {{- include "sam-node.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sam-node.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sam-node.selectorLabels" . | nindent 8 }}
+      annotations:
+        # A config-only change must roll the pods: the node reads its config
+        # file once at startup and never reloads it.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ default (include "sam-node.fullname" .) .Values.serviceAccount.name }}
+      containers:
+        - name: sam-node
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SAM_API_TOKEN
+              value: {{ .Values.apiToken | quote }}
+          args:
+            - "run"
+            - "--config=/etc/sam/sam-node.yaml"
+            - "--control-plane={{ required "controlPlaneUrl is required" .Values.controlPlaneUrl }}"
+            - "--jwt-path=/var/run/secrets/tokens/sam-token"
+            - "--bind-addr={{ .Values.bindAddr }}"
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/sam
+            - name: sam-token
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
+        {{- if .Values.service.image }}
+        - name: {{ .Values.service.name }}
+          image: {{ .Values.service.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.service.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.service.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.service.ports }}
+          ports:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.service.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "sam-node.fullname" . }}-config
+        - name: sam-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: sam-token
+                  expirationSeconds: 3600
+                  audience: {{ .Values.audience | quote }}

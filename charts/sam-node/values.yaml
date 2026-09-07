@@ -1,0 +1,57 @@
+image:
+  repository: sam-node
+  tag: local
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# Required: control plane URL the node enrolls with,
+# e.g. http://sam-mesh-control-plane:8080
+controlPlaneUrl: ""
+
+# Audience of the projected ServiceAccount token; must be one of the control
+# plane's allowedAudiences.
+audience: sam-mesh-audience
+
+# Bearer token protecting the node's local REST API.
+apiToken: devtoken
+
+# Address the node API binds inside the pod. Loopback keeps the API
+# pod-private; set 0.0.0.0:8080 to expose it on the pod IP.
+bindAddr: "127.0.0.1:8080"
+
+# Extra sam-node args, e.g. ["--discovery-interval=200ms"].
+extraArgs: []
+
+# Rendered verbatim as the node's sam-node.yaml: static services the node
+# advertises, and local attenuation.
+config:
+  version: v1alpha1
+  attenuation:
+    policies: []
+    checks: []
+    rules: []
+  services: []
+
+# Optional service container next to the node; they share localhost, so
+# config.services target_url entries point at 127.0.0.1:<port>.
+# Rendered only when image is non-empty.
+service:
+  name: service
+  image: ""
+  command: []
+  env: []
+  ports: []
+  resources: {}
+
+# Set create: false and name to reuse an existing ServiceAccount; annotations
+# cover IAM bindings (e.g. GKE Workload Identity).
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -79,20 +79,21 @@ The buddy shells out to the Gemini CLI, so set your API key on the API-key `ENV`
 line in `development/examples/gemini-buddy-mcp/Dockerfile` before building (a free
 Google AI Studio key is fine for the demo).
 
-### 2. Mesh layout
-
-Host the buddy on one node in `development/kind/mesh-config.yaml`:
-
-```yaml
-node-a:                    # bare node (orchestrator entry)
-node-b: gemini-buddy-mcp   # the buddy
-```
-
-### 3. Bring the mesh up and start a local orchestrator node
+### 2. Bring the mesh up and deploy the buddy
 
 ```bash
 make build            # builds ./bin/sam-node (once)
-make kind-up          # control plane + router + buddy (node-b)
+make kind-up          # control plane + router (no sam-nodes yet)
+docker build -t gemini-buddy-mcp:local development/examples/gemini-buddy-mcp
+kind load docker-image --name sam-kind gemini-buddy-mcp:local
+helm --kube-context kind-sam-kind -n sam-kind install gemini-buddy charts/sam-node \
+  -f development/kind/sam-node.values.yaml \
+  -f development/examples/gemini-buddy-mcp/values.yaml
+```
+
+### 3. Start a local orchestrator node
+
+```bash
 make kind-local-node  # local sam-node enrolled in the mesh — LEAVE RUNNING
 ```
 

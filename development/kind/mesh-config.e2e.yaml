@@ -1,4 +1,0 @@
-# E2E mesh layout: pins calc-mcp so the kind-mesh-e2e check can discover
-# mcp://calculator/add. Select it with MESH_CONFIG=development/kind/mesh-config.e2e.yaml.
-node-a:
-node-b: calc-mcp
