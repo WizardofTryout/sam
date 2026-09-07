@@ -391,7 +391,7 @@ jobs:
             sleep 1
           done
           
-          curl -s -X POST \
+          curl -fsS -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
             -d '{
@@ -399,6 +399,7 @@ jobs:
                 {"name": "sam-canary", "allowed_services": ["*"], "allowed_targets": ["*"]},
                 {"name": "sam:role:sambox", "allowed_services": ["*"], "allowed_targets": ["*"]},
                 {"name": "sam:role:router", "allowed_services": ["*"], "allowed_targets": ["*"]},
+                {"name": "sam:role:node"},
                 {"name": "public-mesh", "allowed_services": ["*"], "allowed_targets": ["*"]}
               ],
               "bindings": [
@@ -408,7 +409,11 @@ jobs:
                 {"role": "public-mesh", "members": ["sam:system:authenticated"]}
               ]
             }' \
-            http://localhost:8080/policies >/dev/null
+            http://localhost:8080/policies || {
+            echo "Policy seeding failed - a rejected policy leaves enrollment broken (nodes get 403 at /register)."
+            kill $PF_PID
+            exit 1
+          }
             
           kill $PF_PID
 
