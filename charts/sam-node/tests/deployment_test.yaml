@@ -57,3 +57,15 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].args
           content: "--discovery-interval=200ms"
+
+  - it: honors serviceAccount.name for the pod
+    template: templates/deployment.yaml
+    set:
+      controlPlaneUrl: http://sam-mesh-control-plane:8080
+      serviceAccount:
+        create: false
+        name: existing-sa
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: existing-sa

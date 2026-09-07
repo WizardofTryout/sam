@@ -18,7 +18,7 @@ spec:
         # file once at startup and never reloads it.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      serviceAccountName: {{ include "sam-node.fullname" . }}
+      serviceAccountName: {{ default (include "sam-node.fullname" .) .Values.serviceAccount.name }}
       containers:
         - name: sam-node
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -43,5 +43,6 @@ service:
 | `config` | empty services | Merged over the chart's defaults and rendered as `sam-node.yaml`; pods roll on config changes |
 | `service.image` | `""` | Service container image; empty = bare node |
 | `service.name/command/env/ports/resources` | — | Service container spec |
+| `serviceAccount.create/name/annotations` | `true` / fullname / `{}` | Skip creation, reuse an existing SA, or annotate it (e.g. Workload Identity) |
 | `image.repository/tag/pullPolicy` | `sam-node:local` | Node image |
 | `replicaCount` | `1` | Each replica enrolls as its own mesh node |

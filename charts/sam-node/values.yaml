@@ -44,6 +44,13 @@ service:
   ports: []
   resources: {}
 
+# Set create: false and name to reuse an existing ServiceAccount; annotations
+# cover IAM bindings (e.g. GKE Workload Identity).
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
 resources: {}
 nodeSelector: {}
 tolerations: []
