@@ -42,7 +42,7 @@ spec:
         - "/bin/bash"
         - "-c"
         - |
-          pip install --no-cache-dir httpx mcp &&
+          pip install --no-cache-dir httpx 'mcp>=2,<3' &&
           python -u /app/banana_bot_playground.py
         env:
         - name: SAM_MCP_URL

@@ -6,7 +6,7 @@ import random
 import httpx
 from typing import Optional, Dict, Any, List
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 
 class SamClient:
     """Inlined SAM Client for self-contained execution."""
@@ -25,8 +25,15 @@ class SamClient:
         headers = {"Accept": "application/json, text/event-stream"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        self._sse_cm = streamablehttp_client(self.server_url, headers=headers)
-        read_stream, write_stream, _ = await self._sse_cm.__aenter__()
+        self._http_client = httpx.AsyncClient(
+            headers=headers,
+            follow_redirects=True,
+            # The SDK's SSE-friendly defaults; httpx's default 5s read timeout drops the stream.
+            timeout=httpx.Timeout(30.0, read=300.0),
+        )
+        self._sse_cm = streamable_http_client(self.server_url, http_client=self._http_client)
+        res = await self._sse_cm.__aenter__()
+        read_stream, write_stream = res[0], res[1]
         self.session = ClientSession(read_stream, write_stream)
         await self.session.__aenter__()
         await self.session.initialize()
@@ -36,8 +43,11 @@ class SamClient:
             await self.session.__aexit__(None, None, None)
         if self._sse_cm:
             await self._sse_cm.__aexit__(None, None, None)
+        if getattr(self, "_http_client", None):
+            await self._http_client.aclose()
         self.session = None
         self._sse_cm = None
+        self._http_client = None
 
     async def get_tools(self) -> List[Dict[str, Any]]:
         if not self.session:
