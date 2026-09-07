@@ -36,4 +36,5 @@ kind load docker-image --name sam-kind "${NAME}:local"
 "${HELM}" --kube-context kind-sam-kind -n sam-kind upgrade --install "${RELEASE}" "${PROJECT_ROOT}/charts/sam-node" \
   -f "${PROJECT_ROOT}/development/kind/sam-node.values.yaml" \
   -f "${DIR}/values.yaml" ${HELM_ARGS[@]+"${HELM_ARGS[@]}"}
-kubectl --context kind-sam-kind -n sam-kind rollout status "deployment/${RELEASE}-sam-node" --timeout=180s
+kubectl --context kind-sam-kind -n sam-kind rollout status deployment \
+  -l "app.kubernetes.io/name=sam-node,app.kubernetes.io/instance=${RELEASE}" --timeout=180s
