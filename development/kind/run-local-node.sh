@@ -45,7 +45,7 @@ echo "  MCP/sidecar API on 127.0.0.1:9099"
 # Throwaway identity per run: the default data-dir keeps the biscuit from a
 # previous cluster, and enrolling with it against a fresh control plane fails.
 DATA_DIR="$(mktemp -d)"
-cleanup() { [[ -n "${NODE_PID:-}" ]] && kill "${NODE_PID}" 2>/dev/null || true; rm -rf "${DATA_DIR}"; }
+cleanup() { [[ -n "${NODE_PID:-}" ]] && kill "${NODE_PID}" 2>/dev/null || true; [[ -n "${DATA_DIR:-}" && -d "${DATA_DIR}" ]] && rm -rf "${DATA_DIR}"; }
 trap cleanup EXIT INT TERM
 
 export SAM_API_TOKEN=devtoken
