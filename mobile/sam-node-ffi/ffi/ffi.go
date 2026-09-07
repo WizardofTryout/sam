@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/sam/api"
 	"github.com/google/sam/internal/node"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -41,6 +42,8 @@ var (
 	sidecarSrv  *http.Server
 	unauthSrv   *http.Server
 	mu          sync.Mutex
+
+	logger = golog.Logger("sam-node-ffi")
 )
 
 // MobileConfig holds simple configuration options for the mobile agent.
@@ -55,6 +58,17 @@ type MobileConfig struct {
 	ListenAddrs       string `json:"listenAddrs"` // comma-separated
 	AllowLoopback     bool   `json:"allowLoopback"`
 	EnableRelay       bool   `json:"enableRelay"`
+	// Services this node exposes, declared at start like the node config
+	// file's services block; there is no runtime registration.
+	Services []MobileService `json:"services,omitempty"`
+}
+
+// MobileService is one statically declared service.
+type MobileService struct {
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	TargetURL   string `json:"targetUrl"`
 }
 
 // StartNode starts the mesh node and the local sidecar API server.
@@ -157,6 +171,21 @@ func StartNode(configJSON string) error {
 	}
 
 	// Create and initialize the node
+	var services []api.ServiceConfig
+	for i, svc := range config.Services {
+		if err := api.ValidateServiceFormat(svc.Type + "://" + svc.Name); err != nil {
+			_ = store.Close()
+			activeStore = nil
+			return fmt.Errorf("invalid service at index %d: %w", i, err)
+		}
+		services = append(services, api.ServiceConfig{
+			Type:        svc.Type,
+			Name:        svc.Name,
+			Description: svc.Description,
+			TargetURL:   svc.TargetURL,
+		})
+	}
+
 	samNode, err := node.NewSamNode(node.Options{
 		PrivKey:              priv,
 		ControlPlanePubKey:   controlPlanePubKey,
@@ -167,6 +196,7 @@ func StartNode(configJSON string) error {
 		ListenAddrs:          listenAddrs,
 		EnableRelay:          config.EnableRelay,
 		AllowLoopback:        config.AllowLoopback,
+		NodeConfig:           &node.NodeConfigComplete{Services: services},
 		MonitorBootstrap:     2 * time.Minute,
 		MonitorInterval:      1 * time.Minute,
 		AutoRelayMinInterval: 30 * time.Second,
@@ -189,6 +219,27 @@ func StartNode(configJSON string) error {
 		return fmt.Errorf("failed to start node: %w", err)
 	}
 	activeNode = samNode
+
+	// Register the declared services, like cmd/sam-node does after Start.
+	// In the background with retries: on mobile the first router connection
+	// can take minutes, and RegisterStaticServices waits only briefly for
+	// mesh connectivity before giving up.
+	if len(services) > 0 {
+		go func() {
+			for {
+				err := samNode.RegisterStaticServices(ctx, services)
+				if err == nil {
+					return
+				}
+				logger.Warnf("Registering static services (will retry): %v", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(3 * time.Second):
+				}
+			}
+		}()
+	}
 
 	// Start Sidecar API Server
 	bindAddr := config.BindAddr
