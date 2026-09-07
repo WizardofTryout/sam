@@ -40,13 +40,19 @@ type Options struct {
 	ControlPlanePubKey ed25519.PublicKey
 	RouterAddrs        []multiaddr.Multiaddr
 	Store              *Store
-	MeshID             string
-	DiscoveryInterval  string
-	ListenAddrs        []string
-	EnableRelay        bool
-	NodeConfig         *NodeConfigComplete
-	KeyGracePeriod     time.Duration
-	AllowLoopback      bool
+
+	// BannedPeerIDs seeds the revocation cache from the control plane's ban
+	// set (see SyncMeshConfig). Without it a restarted node would enforce no
+	// ban until the next MeshEvent_BANNED, which for an existing ban never
+	// comes.
+	BannedPeerIDs     []string
+	MeshID            string
+	DiscoveryInterval string
+	ListenAddrs       []string
+	EnableRelay       bool
+	NodeConfig        *NodeConfigComplete
+	KeyGracePeriod    time.Duration
+	AllowLoopback     bool
 	// AnnouncePrivateAddrs controls whether RFC1918/ULA addresses are published
 	// to the mesh. Nil means true: private meshes reach each other over exactly
 	// those addresses. Set false on nodes that are only reachable via routers or
