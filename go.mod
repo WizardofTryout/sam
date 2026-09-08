@@ -24,7 +24,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/openai/openai-go v1.12.0
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.3
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.5.0
 	go.uber.org/zap v1.28.0
